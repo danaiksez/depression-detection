@@ -5,6 +5,7 @@ import torch.nn.functional as F
 
 from slp.modules.helpers import PackSequence, PadPackedSequence
 from slp.data.therapy import pad_sequence
+from slp.load_lexicons.get_all_6lexicons import LexiconFeatures
 
 #DEVICE = 'cpu'
 DEVICE = 'cuda' if torch.cuda.is_available() else 'cpu'
@@ -19,7 +20,7 @@ def repackage_hidden(h):
         return tuple(repackage_hidden(v) for v in h)
 
 class WordAttNet(nn.Module):
-    def __init__(self, dict_size, diction, lex_size, idx2word, hidden_size=300):
+    def __init__(self, dict_size, diction, lex_size, idx2word, hidden_size=300, lexicons=False):
         super(WordAttNet, self).__init__()
 
         self.gru = nn.GRU(300, 300, bidirectional = True, batch_first=True)
@@ -32,6 +33,11 @@ class WordAttNet(nn.Module):
         self.lookup = nn.Embedding(num_embeddings = self.dict_size, embedding_dim =300).from_pretrained(self.diction)
         self.pack = PackSequence(batch_first=True)
         self.unpack = PadPackedSequence(batch_first=True)
+        self.lexicons = lexicons
+        self.idx2word = idx2word
+        self.lex_size = lex_size
+        if self.lexicons:
+            self.lex_features = LexiconFeatures()
 
     def forward(self, inputs, lengths, hidden_state, idx2word, lex_size, is_title=False):
         del idx2word
@@ -40,6 +46,10 @@ class WordAttNet(nn.Module):
         output, lengths = self.pack(output_emb ,lengths)
         f_output, h_output = self.gru(output.float(), hidden_state)
         f_output = self.unpack(f_output, lengths)
+
+        if self.lexicons:
+            output_lex = self.lexicons(inputs[:, :f_output.shape[1]], self.idx2word, self.lex_size)
+            f_output = torch.cat((f_output, output_lex), axis=2)
 
         output = self.word(f_output)
         output = self.context(output)
@@ -62,7 +72,6 @@ class SentAttNet(nn.Module):
 
 
     def forward(self, inputs, lengths, hidden_state):
-#        import pdb; pdb.set_trace()
         f_output, lengths = self.pack(inputs, lengths)
         f_output, h_output = self.gru(f_output, hidden_state)
         f_output = self.unpack(f_output, lengths)
@@ -76,7 +85,7 @@ class SentAttNet(nn.Module):
 
 
 class HierAttNet(nn.Module):
-    def __init__(self, hidden_size, batch_size, num_classes, max_sent_len, dict_size, diction, idx2word, lex_size):
+    def __init__(self, hidden_size, batch_size, num_classes, max_sent_len, dict_size, diction, idx2word, lex_size, lexicons=False):
         super (HierAttNet, self).__init__()
 
         self.num_classes = num_classes
@@ -86,7 +95,7 @@ class HierAttNet(nn.Module):
         self.lex_size = lex_size
 
         self.sent_att_net = SentAttNet(lex_size, self.hidden_size, num_classes)
-        self.word_att_net_text = WordAttNet(dict_size, diction, lex_size, idx2word, hidden_size)
+        self.word_att_net_text = WordAttNet(dict_size, diction, lex_size, idx2word, hidden_size, lexicons)
 
         self.max_sent_len = max_sent_len
 

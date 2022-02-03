@@ -11,7 +11,7 @@ from sklearn.model_selection import KFold
 from slp.data.collators import SequenceClassificationCollator
 from slp.data.therapy import PsychologicalDataset, TupleDataset
 from slp.data.transforms import SpacyTokenizer, ToTokenIds, ToTensor, ReplaceUnknownToken
-from slp.modules.hier_att_net import HierAttNet
+from slp.modules.basic_model import HierAttNet
 from slp.util.embeddings import EmbeddingsLoader
 from slp.trainer import SequentialTrainer
 
@@ -61,9 +61,9 @@ def kfold_split(dataset, batch_train, batch_val, k=5, shuffle=True, seed=None):
     for train_indices, val_indices in kfold.split(dataset):
         yield dataloaders_from_indices(dataset, train_indices, val_indices, batch_train, batch_val)
 
-def trainer_factory(embeddings, device=DEVICE):
+def trainer_factory(embeddings, idx2word, lex_size, device=DEVICE):
     model = HierAttNet(
-        hidden_size, batch_size, num_classes, max_sent_length, len(embeddings), embeddings)
+        hidden_size, batch_size, num_classes, max_sent_length, len(embeddings), embeddings, idx2word, lex_size, lexicons)
     model = model.to(DEVICE)
     criterion = nn.CrossEntropyLoss()
     optimizer = Adam(model.parameters(), lr=0.001)
@@ -97,6 +97,8 @@ if __name__ == '__main__':
     batch_size = 8
     hidden_size = 300
     epochs = 40
+    lexicons = False
+    lex_size = 99
 
     loader = EmbeddingsLoader('/data/embeddings/glove.840B.300d.txt', 300)
     word2idx, idx2word, embeddings = loader.load()
@@ -119,7 +121,7 @@ if __name__ == '__main__':
         cv_scores = []
         import gc
         for train_loader, val_loader in kfold_split(bio, batch_train, batch_val):
-            trainer = trainer_factory(embeddings, device=DEVICE)
+            trainer = trainer_factory(embeddings, idx2word, lex_size, device=DEVICE)
             fold_score = trainer.fit(train_loader, val_loader, epochs=MAX_EPOCHS)
             cv_scores.append(fold_score)
             del trainer

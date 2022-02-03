@@ -4,7 +4,7 @@ from torch.nn.utils.rnn import pack_padded_sequence , pad_sequence
 
 from slp.modules.util import pad_mask, subsequent_mask
 from slp.util import mktensor
-from slp.data.therapy_title import pad_sequence as pad_sequence1
+from slp.data.therapy import pad_sequence as pad_sequence1
 
 
 class SequenceClassificationCollator(object):
@@ -26,7 +26,7 @@ class SequenceClassificationCollator(object):
                                padding_value=self.pad_indx)
                   .to(self.device))
         length_of_sentences = pad_sequence1(length_of_sentences, padding_len=inputs.shape[1], batch_first=True, padding_value=1)
-       
+        
         lengths_title = torch.tensor([len(t) for t in titles], device=self.device)
         titles = (pad_sequence(titles,
                                batch_first=True,
