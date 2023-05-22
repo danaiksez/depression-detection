@@ -3,7 +3,7 @@ numpy>=1.15.0
 pytorch-ignite==0.2.0
 pytorch_nlp==0.4.1
 transformers==2.0.0
-requests==2.21.0
+requests==2.31.0
 rpdb>=0.1.6
 scikit_learn>=0.20.1
 scipy>=1.0.0
